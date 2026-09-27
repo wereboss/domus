@@ -6,7 +6,7 @@ DATA_DIR = BASE_DIR / "data"
 
 class Settings(BaseSettings):
     APP_NAME: str = "Domus - Your Home, Organised"
-    APP_VERSION: str = "0.1.0"
+    APP_VERSION: str = "0.2.0"
     DEBUG: bool = False
     
     # Storage & DB Paths (Option A: Strict Dual SQLite Isolation)

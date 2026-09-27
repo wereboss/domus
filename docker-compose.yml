@@ -1,0 +1,13 @@
+services:
+  domus:
+    build: .
+    image: domus:v0.2.0
+    container_name: domus
+    restart: unless-stopped
+    ports:
+      - "9035:9035"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - PORT=9035
+      - SECRET_KEY=domus-change-this-in-production-for-persistent-sessions
