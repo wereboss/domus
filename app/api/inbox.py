@@ -2,7 +2,7 @@ from datetime import datetime, date
 from pathlib import Path
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Request, Query
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 from app.config import DATA_DIR
 from app.db.logistics import get_logistics_db
@@ -71,6 +71,10 @@ async def receive_share_target_post(
         item_title = shared_title or (shared_url if shared_url else (shared_text[:40] + "..." if len(shared_text) > 40 else shared_text))
 
     raw_content = shared_url if shared_url else shared_text
+
+    # Guard against empty share intents (e.g. Android WebAPK permission bug where file is stripped)
+    if not file_rel_path and not raw_content and not shared_title:
+        return RedirectResponse("/static/share-confirmation.html?status=empty", status_code=303)
 
     inbox_item = UnprocessedInbox(
         source="share_target",
