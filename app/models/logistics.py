@@ -42,6 +42,7 @@ class Note(LogisticsBase):
     content = Column(Text, nullable=False)
     author_id = Column(Integer, ForeignKey("household_members.id"), nullable=True, index=True)
     category = Column(String(64), default="General", nullable=False)
+    attachment_path = Column(String(255), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     author = relationship("HouseholdMember", foreign_keys=[author_id])

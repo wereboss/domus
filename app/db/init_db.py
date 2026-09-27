@@ -1,4 +1,5 @@
 from datetime import date
+from sqlalchemy import text
 from app.db.base import LogisticsBase, FinanceBase
 from app.db.logistics import logistics_engine, LogisticsSessionLocal
 from app.db.finance import finance_engine, FinanceSessionLocal
@@ -13,6 +14,14 @@ def init_databases():
     # Create tables in Logistics DB
     LogisticsBase.metadata.create_all(bind=logistics_engine)
     
+    # Auto-migrate notes table if attachment_path column is missing
+    with logistics_engine.connect() as conn:
+        try:
+            conn.execute(text("ALTER TABLE notes ADD COLUMN attachment_path VARCHAR(255);"))
+            conn.commit()
+        except Exception:
+            pass
+
     # Create tables in Finance DB
     FinanceBase.metadata.create_all(bind=finance_engine)
     

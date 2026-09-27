@@ -178,3 +178,35 @@ def test_dismiss_inbox_item(client, logistics_session):
 
     inbox_item = logistics_session.query(UnprocessedInbox).filter(UnprocessedInbox.id == item_id).first()
     assert inbox_item.status == "dismissed"
+
+def test_triage_image_inbox_to_note_preserves_attachment(client, logistics_session):
+    file_bytes = b"\xff\xd8\xff\xe0\x00\x10JFIFfakeimagecontent"
+    upload_resp = client.post(
+        "/api/inbox/upload",
+        files={"file": ("school_flyer.jpg", file_bytes, "image/jpeg")}
+    )
+    assert upload_resp.status_code == 201
+    item_data = upload_resp.json()
+    item_id = item_data["id"]
+    assert item_data["file_url"] is not None
+    assert "school_flyer.jpg" in item_data["file_url"]
+
+    # Verify file is servable via file_url and via original name
+    file_resp = client.get(item_data["file_url"])
+    assert file_resp.status_code == 200
+
+    fallback_resp = client.get("/api/inbox/files/school_flyer.jpg")
+    assert fallback_resp.status_code == 200
+
+    # Triage to Note
+    triage_resp = client.post(f"/api/inbox/{item_id}/triage", json={
+        "target_type": "note",
+        "title": "School Schedule Flyer",
+        "content": "Fall semester schedule"
+    })
+    assert triage_resp.status_code == 200
+
+    note = logistics_session.query(Note).filter(Note.title == "School Schedule Flyer").first()
+    assert note is not None
+    assert note.attachment_path is not None
+    assert "school_flyer.jpg" in note.attachment_path

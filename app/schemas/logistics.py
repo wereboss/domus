@@ -57,6 +57,7 @@ class NoteBase(BaseModel):
     title: str = Field(..., min_length=1, max_length=255)
     content: str
     category: str = Field(default="General", max_length=64)
+    attachment_path: Optional[str] = None
 
 class NoteCreate(NoteBase):
     pass
@@ -64,6 +65,7 @@ class NoteCreate(NoteBase):
 class NoteResponse(NoteBase):
     id: int
     author_id: Optional[int] = None
+    attachment_path: Optional[str] = None
     created_at: datetime
     author: Optional[HouseholdMemberResponse] = None
 

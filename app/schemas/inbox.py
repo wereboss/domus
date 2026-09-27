@@ -18,6 +18,7 @@ class InboxItemResponse(InboxItemBase):
     file_name: Optional[str] = None
     file_mime_type: Optional[str] = None
     file_size: Optional[int] = None
+    file_url: Optional[str] = None
     suggested_action: str
     status: str
     captured_by_id: Optional[int] = None

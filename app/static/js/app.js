@@ -489,6 +489,17 @@ document.addEventListener("alpine:init", () => {
       if (bytes < 1024) return bytes + " B";
       if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
       return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+    },
+
+    isImageAttachment(path) {
+      if (!path) return false;
+      const clean = path.toLowerCase().split("?")[0];
+      return clean.endsWith(".jpg") || clean.endsWith(".jpeg") || clean.endsWith(".png") || clean.endsWith(".webp") || clean.endsWith(".gif") || clean.endsWith(".heic");
+    },
+
+    getFilename(path) {
+      if (!path) return "";
+      return path.split("/").pop();
     }
   }));
 });

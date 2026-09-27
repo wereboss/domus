@@ -134,6 +134,7 @@ def create_note(
         title=payload.title,
         content=payload.content,
         category=payload.category,
+        attachment_path=payload.attachment_path,
         author_id=current_member.id if current_member else None
     )
     db.add(note)

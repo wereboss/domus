@@ -24,17 +24,25 @@ CONFIRMATION_HTML = Path(__file__).resolve().parent.parent / "static" / "share-c
 
 @router.post("/share-target", response_class=FileResponse)
 async def receive_share_target_post(
-    title: Optional[str] = Form(None),
-    text: Optional[str] = Form(None),
-    url: Optional[str] = Form(None),
-    files: Optional[List[UploadFile]] = File(None),
+    request: Request,
     db: Session = Depends(get_logistics_db)
 ):
     """Intercepts incoming POST data from OS native Share sheet."""
-    # Determine primary content and item type
-    shared_text = text or ""
-    shared_url = url or ""
-    shared_title = title or ""
+    try:
+        form = await request.form()
+    except Exception:
+        form = {}
+
+    shared_title = str(form.get("title") or "").strip()
+    shared_text = str(form.get("text") or "").strip()
+    shared_url = str(form.get("url") or "").strip()
+
+    # Discover ANY uploaded file across any form field key (e.g. 'files', 'file', 'image')
+    uploaded_files: List[UploadFile] = []
+    for key in form.keys():
+        for val in form.getlist(key):
+            if hasattr(val, "filename") and val.filename:
+                uploaded_files.append(val)
 
     # Check if a URL was passed inside text
     if not shared_url and ("http://" in shared_text or "https://" in shared_text):
@@ -43,22 +51,26 @@ async def receive_share_target_post(
                 shared_url = word
                 break
 
-    raw_content = shared_url if shared_url else shared_text
-    item_type = "link" if shared_url else "text"
-    item_title = shared_title or (shared_url if shared_url else (shared_text[:40] + "..." if len(shared_text) > 40 else shared_text))
-
     file_rel_path = None
     file_orig_name = None
     file_mime = None
     file_sz = None
+    item_type = "link" if shared_url else "text"
 
     # Handle file if attached
-    if files and len(files) > 0 and files[0].filename:
-        upload = files[0]
+    if uploaded_files:
+        upload = uploaded_files[0]
         file_rel_path, file_orig_name, file_mime, file_sz, detected_type = await save_uploaded_file(upload)
         item_type = detected_type
-        if not item_title or item_title == "":
-            item_title = file_orig_name
+        item_title = shared_title or file_orig_name
+    else:
+        # Check if the shared URL or text points directly to an image
+        url_check = (shared_url or shared_text).lower().split("?")[0]
+        if any(url_check.endswith(ext) for ext in [".jpg", ".jpeg", ".png", ".webp", ".gif", ".heic"]):
+            item_type = "image"
+        item_title = shared_title or (shared_url if shared_url else (shared_text[:40] + "..." if len(shared_text) > 40 else shared_text))
+
+    raw_content = shared_url if shared_url else shared_text
 
     inbox_item = UnprocessedInbox(
         source="share_target",
@@ -118,9 +130,20 @@ def receive_share_target_get(
 @router.get("/api/inbox", response_model=List[InboxItemResponse])
 def list_pending_inbox_items(db: Session = Depends(get_logistics_db)):
     """Returns all pending items in the Family Inbox."""
-    return db.query(UnprocessedInbox).filter(
+    items = db.query(UnprocessedInbox).filter(
         UnprocessedInbox.status == "pending"
     ).order_by(UnprocessedInbox.created_at.desc()).all()
+    results = []
+    for it in items:
+        resp = InboxItemResponse.model_validate(it)
+        if it.file_path:
+            resp.file_url = f"/api/inbox/files/{Path(it.file_path).name}"
+        elif it.file_name:
+            resp.file_url = f"/api/inbox/files/{it.file_name}"
+        elif it.raw_content and any(it.raw_content.lower().split("?")[0].endswith(ext) for ext in [".jpg", ".jpeg", ".png", ".webp", ".gif"]):
+            resp.file_url = it.raw_content
+        results.append(resp)
+    return results
 
 @router.get("/api/inbox/count", response_model=InboxCountResponse)
 def get_inbox_count(db: Session = Depends(get_logistics_db)):
@@ -141,6 +164,9 @@ def create_inbox_item(
     if not item_type or item_type == "text":
         if raw_content.startswith("http://") or raw_content.startswith("https://"):
             item_type = "link"
+            url_clean = raw_content.lower().split("?")[0]
+            if any(url_clean.endswith(ext) for ext in [".jpg", ".jpeg", ".png", ".webp", ".gif"]):
+                item_type = "image"
 
     item = UnprocessedInbox(
         source=payload.source or "in_app_paste",
@@ -153,7 +179,10 @@ def create_inbox_item(
     db.add(item)
     db.commit()
     db.refresh(item)
-    return item
+    resp = InboxItemResponse.model_validate(item)
+    if item_type == "image" and raw_content.startswith("http"):
+        resp.file_url = raw_content
+    return resp
 
 @router.post("/api/inbox/upload", response_model=InboxItemResponse, status_code=status.HTTP_201_CREATED)
 async def upload_inbox_file(
@@ -179,7 +208,9 @@ async def upload_inbox_file(
     db.add(item)
     db.commit()
     db.refresh(item)
-    return item
+    resp = InboxItemResponse.model_validate(item)
+    resp.file_url = f"/api/inbox/files/{Path(file_rel_path).name}"
+    return resp
 
 @router.post("/api/inbox/{item_id}/triage")
 def triage_inbox_item(
@@ -223,8 +254,9 @@ def triage_inbox_item(
     elif payload.target_type == "note":
         new_note = Note(
             title=payload.title,
-            content=payload.content or item.raw_content or (f"Attached file: {item.file_name}" if item.file_name else "Quick capture note"),
+            content=payload.content or item.raw_content or "",
             category="Inbox",
+            attachment_path=item.file_path,
             author_id=current_member.id if current_member else None
         )
         log_db.add(new_note)
@@ -245,9 +277,14 @@ def dismiss_inbox_item(item_id: int, db: Session = Depends(get_logistics_db)):
 
 @router.get("/api/inbox/files/{filename}")
 def serve_inbox_file(filename: str):
-    """Serves uploaded images and documents."""
+    """Serves uploaded images and documents with fallback matching."""
     safe_filename = Path(filename).name
     file_path = INBOX_UPLOAD_DIR / safe_filename
     if not file_path.exists():
-        raise HTTPException(status_code=404, detail="File not found")
+        # Fallback: search for file ending with _{safe_filename}
+        matches = list(INBOX_UPLOAD_DIR.glob(f"*_{safe_filename}"))
+        if matches:
+            file_path = matches[0]
+        else:
+            raise HTTPException(status_code=404, detail="File not found")
     return FileResponse(file_path)
