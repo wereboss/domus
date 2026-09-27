@@ -1,4 +1,4 @@
-const CACHE_NAME = "domus-v3";
+const CACHE_NAME = "domus-v4";
 const ASSETS_TO_CACHE = [
   "/",
   "/manifest.json",
