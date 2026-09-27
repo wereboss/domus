@@ -432,22 +432,24 @@
       <!-- Form: Quick Task -->
       <template x-if="addType === 'task'">
         <div>
-          <label style="font-size: 0.8rem; font-weight: 600; color: #94a3b8;">Task Title</label>
-          <input 
-            type="text" 
-            x-model="newTask.title" 
-            placeholder="e.g., Pick up kids from swimming" 
-            autofocus
-            style="margin-bottom: 12px; height: 48px; border-radius: 8px;">
+          <div class="domus-form-group">
+            <label class="domus-label">Task Title</label>
+            <input 
+              type="text" 
+              class="domus-input"
+              x-model="newTask.title" 
+              placeholder="e.g., Pick up kids from swimming" 
+              autofocus>
+          </div>
 
-          <div style="display: flex; gap: 8px; margin-bottom: 12px;">
-            <div style="flex: 1;">
-              <label style="font-size: 0.8rem; font-weight: 600; color: #94a3b8;">Time (24h)</label>
-              <input type="time" x-model="newTask.due_time" style="height: 48px; border-radius: 8px;">
+          <div class="domus-form-row">
+            <div class="domus-form-col">
+              <label class="domus-label">Time (24h)</label>
+              <input type="time" class="domus-input" x-model="newTask.due_time">
             </div>
-            <div style="flex: 1;">
-              <label style="font-size: 0.8rem; font-weight: 600; color: #94a3b8;">Assignee</label>
-              <select x-model="newTask.assigned_to_id" style="height: 48px; border-radius: 8px;">
+            <div class="domus-form-col">
+              <label class="domus-label">Assignee</label>
+              <select class="domus-select" x-model="newTask.assigned_to_id">
                 <option :value="null">Shared (All)</option>
                 <template x-for="p in profiles" :key="p.id">
                   <option :value="p.id" x-text="p.name"></option>
@@ -461,22 +463,29 @@
       <!-- Form: Quick Expense -->
       <template x-if="addType === 'expense'">
         <div>
-          <label style="font-size: 0.8rem; font-weight: 600; color: #94a3b8;">Expense Title / Payee</label>
-          <input 
-            type="text" 
-            x-model="newExpense.title" 
-            placeholder="e.g., Supermarket groceries" 
-            autofocus
-            style="margin-bottom: 12px; height: 48px; border-radius: 8px;">
+          <div class="domus-form-group">
+            <label class="domus-label">Expense Title / Payee</label>
+            <input 
+              type="text" 
+              class="domus-input"
+              x-model="newExpense.title" 
+              placeholder="e.g., Supermarket groceries" 
+              autofocus>
+          </div>
 
-          <div style="display: flex; gap: 8px; margin-bottom: 12px;">
-            <div style="flex: 1;">
-              <label style="font-size: 0.8rem; font-weight: 600; color: #94a3b8;">Amount ($)</label>
-              <input type="number" step="0.01" x-model="newExpense.amount" placeholder="0.00" style="height: 48px; border-radius: 8px;">
+          <div class="domus-form-row">
+            <div class="domus-form-col">
+              <label class="domus-label">Amount ($)</label>
+              <input 
+                type="number" 
+                step="0.01" 
+                class="domus-input"
+                x-model="newExpense.amount" 
+                placeholder="0.00">
             </div>
-            <div style="flex: 1;">
-              <label style="font-size: 0.8rem; font-weight: 600; color: #94a3b8;">Category</label>
-              <select x-model="newExpense.category" style="height: 48px; border-radius: 8px;">
+            <div class="domus-form-col">
+              <label class="domus-label">Category</label>
+              <select class="domus-select" x-model="newExpense.category">
                 <option value="Groceries">Groceries</option>
                 <option value="Utilities">Utilities</option>
                 <option value="Kids">Kids</option>
