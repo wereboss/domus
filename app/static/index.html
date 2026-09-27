@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Domus - Your Home, Organised</title>
+  
+  <!-- PWA & Mobile Meta Tags -->
+  <meta name="theme-color" content="#0f172a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="icon" type="image/svg+xml" href="/static/icons/icon.svg">
+
+  <!-- Vendored Core Libraries (100% Offline Capable) -->
+  <link rel="stylesheet" href="/static/vendor/pico.min.css">
+  <link rel="stylesheet" href="/static/css/app.css">
+  <script src="/static/vendor/dexie.min.js"></script>
+  <script src="/static/js/db.js"></script>
+  <script src="/static/js/api.js"></script>
+  <script defer src="/static/vendor/alpine.min.js"></script>
+  <script src="/static/js/app.js"></script>
+</head>
+<body x-data="domusApp()">
+
+  <!-- Sticky Top Header -->
+  <header class="top-header">
+    <div class="brand-title">
+      <img src="/static/icons/icon.svg" class="brand-icon" alt="Domus Logo">
+      <span>Domus</span>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <!-- Offline Banner Pill (UX Directive 4) -->
+      <span x-show="isOffline" class="offline-pill" style="display: none;" x-cloak>
+        ⚡ Offline
+      </span>
+
+      <!-- Profile Avatar / Login Button -->
+      <template x-if="currentMember">
+        <button 
+          @click="openPinModal(currentMember)" 
+          class="badge-tag" 
+          :style="'background: ' + currentMember.avatar_color + '; color: white; border: none; padding: 6px 12px; cursor: pointer; border-radius: 9999px; font-weight: 700;'"
+          x-text="currentMember.name">
+        </button>
+      </template>
+      <template x-if="!currentMember">
+        <button 
+          @click="openPinModal()" 
+          class="badge-tag" 
+          style="background: #334155; color: white; border: none; padding: 6px 12px; cursor: pointer; border-radius: 9999px;">
+          🔑 PIN Login
+        </button>
+      </template>
+    </div>
+  </header>
+
+  <!-- ============================================================== -->
+  <!-- TAB 1: TODAY / UNIFIED TIMELINE                                -->
+  <!-- ============================================================== -->
+  <main x-show="activeTab === 'today'" style="padding-top: 4px;">
+    <!-- Day Scrubber -->
+    <div class="day-scrubber">
+      <button class="scrub-btn" @click="setDate(-1)" aria-label="Previous Day">‹</button>
+      <div @click="resetToToday()" style="cursor: pointer;">
+        <div class="scrub-date" x-text="formatDisplayDate(currentDate)"></div>
+        <div class="scrub-sub" x-show="currentDate === todayDate">Today (Tap to reset)</div>
+        <div class="scrub-sub" x-show="currentDate !== todayDate" style="color: #38bdf8;">Return to Today</div>
+      </div>
+      <button class="scrub-btn" @click="setDate(1)" aria-label="Next Day">›</button>
+    </div>
+
+    <!-- Filter Bar: All / Shared vs Mine -->
+    <div class="view-filter-bar">
+      <div 
+        class="filter-pill" 
+        :class="{ 'active': filterView === 'all' }" 
+        @click="setFilter('all')">
+        All / Shared
+      </div>
+      <div 
+        class="filter-pill" 
+        :class="{ 'active': filterView === 'mine' }" 
+        @click="setFilter('mine')">
+        <span x-text="currentMember ? currentMember.name + '\'s View' : 'My View'"></span>
+      </div>
+    </div>
+
+    <!-- Summary Metrics -->
+    <div class="metrics-grid">
+      <div class="metric-card">
+        <div class="metric-val" style="color: #38bdf8;" x-text="timeline.summary.completed_tasks + '/' + timeline.summary.total_tasks">0/0</div>
+        <div class="metric-label">Tasks Done</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-val" style="color: #f59e0b;" x-text="formatCurrency(timeline.summary.total_due_bills_amount)">$0.00</div>
+        <div class="metric-label">Bills Due</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-val" style="color: #10b981;" x-text="formatCurrency(timeline.summary.total_spent_today)">$0.00</div>
+        <div class="metric-label">Spent Today</div>
+      </div>
+    </div>
+
+    <!-- Unified Chronological Stream -->
+    <div class="timeline-stream">
+      <template x-for="item in timeline.items" :key="item.id">
+        <div 
+          class="timeline-item" 
+          :class="{
+            'overdue': item.is_overdue,
+            'due-bill': item.item_type === 'bill',
+            'completed': item.is_completed
+          }">
+          
+          <!-- Checkbox Touch Target (48x48px touch target) -->
+          <template x-if="item.item_type === 'task'">
+            <div class="item-check-target" @click="toggleTask(item)">
+              <div class="custom-checkbox" :class="{ 'checked': item.is_completed }">
+                <span x-show="item.is_completed">✓</span>
+              </div>
+            </div>
+          </template>
+
+          <!-- Chore Icon Target -->
+          <template x-if="item.item_type === 'chore'">
+            <div class="item-check-target">
+              <span style="font-size: 1.3rem;">🧹</span>
+            </div>
+          </template>
+
+          <!-- Bill Icon Target -->
+          <template x-if="item.item_type === 'bill'">
+            <div class="item-check-target">
+              <span style="font-size: 1.3rem;">💳</span>
+            </div>
+          </template>
+
+          <!-- Expense Icon Target -->
+          <template x-if="item.item_type === 'expense'">
+            <div class="item-check-target">
+              <span style="font-size: 1.3rem;">🛒</span>
+            </div>
+          </template>
+
+          <!-- Item Body -->
+          <div class="item-content">
+            <p class="item-title" :class="{ 'strikethrough': item.is_completed }" x-text="item.title"></p>
+            <div class="item-meta">
+              <template x-if="item.is_overdue">
+                <span class="badge-tag" style="background: #ef4444; color: white;">OVERDUE</span>
+              </template>
+              <template x-if="item.time_str">
+                <span class="badge-tag" style="background: #334155; color: #e2e8f0;" x-text="item.time_str"></span>
+              </template>
+              <template x-if="item.badge">
+                <span 
+                  class="badge-tag" 
+                  :style="'background: ' + (item.badge_color || '#475569') + '; color: white;'" 
+                  x-text="item.badge">
+                </span>
+              </template>
+              <template x-if="item.category && item.item_type !== 'task'">
+                <span style="color: #94a3b8;" x-text="item.category"></span>
+              </template>
+            </div>
+          </div>
+
+          <!-- Currency Amount (if bill or expense) -->
+          <template x-if="item.amount !== null && item.amount !== undefined">
+            <div class="amount-text" x-text="formatCurrency(item.amount)"></div>
+          </template>
+        </div>
+      </template>
+
+      <!-- Empty State -->
+      <div class="empty-state" x-show="timeline.items.length === 0">
+        <div class="empty-state-icon">✨</div>
+        <div style="font-weight: 600; font-size: 1.1rem; color: #f1f5f9;">All caught up!</div>
+        <div style="font-size: 0.85rem; margin-top: 4px;">No tasks or bills scheduled for this day.</div>
+        <button 
+          @click="openAddSheet('task')" 
+          style="margin-top: 16px; background: #2563eb; color: white; border: none; border-radius: 8px; padding: 10px 20px; font-weight: 600; cursor: pointer;">
+          + Add Something
+        </button>
+      </div>
+    </div>
+  </main>
+
+  <!-- ============================================================== -->
+  <!-- TAB 2: INBOX (TRIAGE QUEUE - UX DIRECTIVE 1 & 2)               -->
+  <!-- ============================================================== -->
+  <main x-show="activeTab === 'inbox'" style="padding: 16px;" x-cloak>
+    <h3 style="margin-bottom: 4px;">📥 Family Inbox</h3>
+    <p style="font-size: 0.85rem; color: #94a3b8; margin-bottom: 16px;">
+      Rapid triage landing deck. Items captured on the go arrive here for 1-tap review.
+    </p>
+
+    <!-- Example triage cards demonstrating UX Directive 1 (48x48 touch targets) -->
+    <div class="timeline-stream" style="padding: 0;">
+      <div class="timeline-item" style="flex-direction: column; align-items: stretch; gap: 12px;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+          <div>
+            <span class="badge-tag" style="background: #f59e0b; color: white; margin-bottom: 6px; display: inline-block;">Incoming Note</span>
+            <div style="font-weight: 700; font-size: 1rem;">Soccer practice moved to 16:30 tomorrow</div>
+            <div style="font-size: 0.8rem; color: #94a3b8; margin-top: 2px;">Shared via Mobile OS Share sheet</div>
+          </div>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <button style="flex: 1; height: 48px; background: #10b981; color: white; border: none; border-radius: 8px; font-weight: 700; cursor: pointer;">
+            Approve ✅
+          </button>
+          <button style="flex: 1; height: 48px; background: #334155; color: white; border: none; border-radius: 8px; font-weight: 700; cursor: pointer;">
+            Edit 📝
+          </button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ============================================================== -->
+  <!-- TAB 3: LOGISTICS (CHORES & NOTES)                               -->
+  <!-- ============================================================== -->
+  <main x-show="activeTab === 'logistics'" style="padding: 16px;" x-cloak>
+    <h3 style="margin-bottom: 4px;">📋 Household Chores</h3>
+    <p style="font-size: 0.85rem; color: #94a3b8; margin-bottom: 16px;">
+      Recurring maintenance and daily commitments.
+    </p>
+
+    <div class="timeline-stream" style="padding: 0; margin-bottom: 24px;">
+      <template x-for="chore in chores" :key="chore.id">
+        <div class="timeline-item" style="justify-content: space-between;">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <span style="font-size: 1.4rem;">🧹</span>
+            <div>
+              <div style="font-weight: 600;" x-text="chore.title"></div>
+              <div style="font-size: 0.75rem; color: #94a3b8;">
+                <span class="badge-tag" style="background: #334155; color: white;" x-text="chore.recurrence"></span>
+                <span>Due: </span><span x-text="chore.next_due_date"></span>
+              </div>
+            </div>
+          </div>
+          <button 
+            @click="completeChoreItem(chore.id)"
+            style="background: #10b981; color: white; border: none; padding: 8px 16px; border-radius: 8px; font-weight: 700; cursor: pointer; min-height: 44px;">
+            Done ✓
+          </button>
+        </div>
+      </template>
+
+      <div class="empty-state" x-show="chores.length === 0">
+        <div>No chores defined yet.</div>
+      </div>
+    </div>
+
+    <h3 style="margin-bottom: 4px;">📝 Household Notes</h3>
+    <div class="timeline-stream" style="padding: 0;">
+      <template x-for="note in notes" :key="note.id">
+        <div class="timeline-item" style="flex-direction: column; align-items: stretch;">
+          <div style="display: flex; justify-content: space-between;">
+            <div style="font-weight: 700;" x-text="note.title"></div>
+            <span class="badge-tag" style="background: #334155; color: white;" x-text="note.category"></span>
+          </div>
+          <div style="font-size: 0.85rem; color: #cbd5e1; margin-top: 4px;" x-text="note.content"></div>
+        </div>
+      </template>
+      <div class="empty-state" x-show="notes.length === 0">
+        <div>No notes added yet.</div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ============================================================== -->
+  <!-- TAB 4: FINANCES (LEDGER & FIXED COMMITMENTS)                   -->
+  <!-- ============================================================== -->
+  <main x-show="activeTab === 'finances'" style="padding: 16px;" x-cloak>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+      <h3 style="margin: 0;">💰 Fixed Bills</h3>
+      <button @click="openAddSheet('expense')" style="background: #2563eb; color: white; border: none; padding: 6px 12px; border-radius: 8px; font-size: 0.85rem; font-weight: 600; cursor: pointer;">
+        + Log Expense
+      </button>
+    </div>
+
+    <!-- Bills List -->
+    <div class="timeline-stream" style="padding: 0; margin-bottom: 24px;">
+      <template x-for="bill in bills" :key="bill.id">
+        <div class="timeline-item" style="justify-content: space-between;">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <span style="font-size: 1.4rem;">💳</span>
+            <div>
+              <div style="font-weight: 600;" x-text="bill.title"></div>
+              <div style="font-size: 0.75rem; color: #94a3b8;">
+                Due Day <span x-text="bill.due_day_of_month"></span> • <span x-text="bill.category"></span>
+              </div>
+            </div>
+          </div>
+          <div style="text-align: right;">
+            <div class="amount-text" x-text="formatCurrency(bill.amount)"></div>
+            <span class="badge-tag" :style="bill.is_auto_pay ? 'background: #10b981; color: white;' : 'background: #f59e0b; color: white;'" x-text="bill.is_auto_pay ? 'Auto-Pay' : 'Manual'"></span>
+          </div>
+        </div>
+      </template>
+    </div>
+
+    <!-- Recent Expenses -->
+    <h3 style="margin-bottom: 12px;">🧾 Recent Expenses</h3>
+    <div class="timeline-stream" style="padding: 0;">
+      <template x-for="exp in expenses" :key="exp.id">
+        <div class="timeline-item" style="justify-content: space-between;">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <span style="font-size: 1.4rem;">🛒</span>
+            <div>
+              <div style="font-weight: 600;" x-text="exp.title"></div>
+              <div style="font-size: 0.75rem; color: #94a3b8;">
+                <span x-text="exp.date"></span> • <span x-text="exp.category"></span>
+              </div>
+            </div>
+          </div>
+          <div class="amount-text" x-text="formatCurrency(exp.amount)"></div>
+        </div>
+      </template>
+    </div>
+  </main>
+
+  <!-- ============================================================== -->
+  <!-- TAB 5: FAMILY & SETTINGS                                       -->
+  <!-- ============================================================== -->
+  <main x-show="activeTab === 'family'" style="padding: 16px;" x-cloak>
+    <h3 style="margin-bottom: 4px;">⚙️ Family Settings</h3>
+    <p style="font-size: 0.85rem; color: #94a3b8; margin-bottom: 20px;">
+      Household profiles, PIN locks, and native sync options.
+    </p>
+
+    <!-- Profiles List -->
+    <div class="metric-card" style="text-align: left; padding: 16px; margin-bottom: 16px;">
+      <div style="font-weight: 700; font-size: 1rem; margin-bottom: 12px;">Household Members</div>
+      <div style="display: flex; flex-direction: column; gap: 10px;">
+        <template x-for="p in profiles" :key="p.id">
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <div :style="'width: 14px; height: 14px; border-radius: 50%; background: ' + p.avatar_color"></div>
+              <span style="font-weight: 600;" x-text="p.name"></span>
+              <span x-show="currentMember && currentMember.id === p.id" class="badge-tag" style="background: #2563eb; color: white;">Active Device</span>
+            </div>
+            <button 
+              @click="openPinModal(p)" 
+              style="background: #334155; color: white; border: none; padding: 6px 12px; border-radius: 6px; font-size: 0.8rem; cursor: pointer;">
+              Switch to PIN
+            </button>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <!-- Native Webcal Feed Placeholder (Phase 4 integration) -->
+    <div class="metric-card" style="text-align: left; padding: 16px;">
+      <div style="font-weight: 700; font-size: 1rem; margin-bottom: 6px;">📅 Phone Calendar Sync (.ics)</div>
+      <p style="font-size: 0.8rem; color: #94a3b8; margin: 0 0 10px 0;">
+        Subscribe via iOS or Android calendar to bring daily reminders to your phone lock screen.
+      </p>
+      <code style="background: #0f172a; padding: 8px 12px; border-radius: 6px; font-size: 0.75rem; display: block; overflow-x: auto; color: #38bdf8;">
+        webcal://domus.local/api/calendar/feed.ics
+      </code>
+    </div>
+  </main>
+
+  <!-- ============================================================== -->
+  <!-- BOTTOM NAVIGATION BAR (UX DIRECTIVE 1: THUMB-ANCHORED)        -->
+  <!-- ============================================================== -->
+  <nav class="bottom-nav">
+    <!-- Tab 1: Today -->
+    <button class="nav-tab" :class="{ 'active': activeTab === 'today' }" @click="switchTab('today')">
+      <span class="nav-tab-icon">📅</span>
+      <span>Today</span>
+    </button>
+
+    <!-- Tab 2: Inbox -->
+    <button class="nav-tab" :class="{ 'active': activeTab === 'inbox' }" @click="switchTab('inbox')">
+      <span class="nav-tab-icon">📥</span>
+      <span>Inbox</span>
+    </button>
+
+    <!-- Center Floating Action Button (+) -->
+    <div class="center-fab-wrapper">
+      <button class="center-fab" @click="openAddSheet()" aria-label="Quick Add Entry">
+        +
+      </button>
+    </div>
+
+    <!-- Tab 3: Logistics -->
+    <button class="nav-tab" :class="{ 'active': activeTab === 'logistics' }" @click="switchTab('logistics')">
+      <span class="nav-tab-icon">📋</span>
+      <span>Logistics</span>
+    </button>
+
+    <!-- Tab 4: Finances -->
+    <button class="nav-tab" :class="{ 'active': activeTab === 'finances' }" @click="switchTab('finances')">
+      <span class="nav-tab-icon">💰</span>
+      <span>Finances</span>
+    </button>
+
+    <!-- Tab 5: Family -->
+    <button class="nav-tab" :class="{ 'active': activeTab === 'family' }" @click="switchTab('family')">
+      <span class="nav-tab-icon">⚙️</span>
+      <span>Family</span>
+    </button>
+  </nav>
+
+  <!-- ============================================================== -->
+  <!-- QUICK-ADD BOTTOM SHEET DRAWER (UX DIRECTIVE 1 & 2)             -->
+  <!-- ============================================================== -->
+  <div 
+    class="bottom-sheet-backdrop" 
+    x-show="isAddOpen" 
+    x-transition.opacity 
+    @click.self="closeAddSheet()" 
+    style="display: none;" 
+    x-cloak>
+    
+    <div class="bottom-sheet-content" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="transform translate-y-full" x-transition:enter-end="transform translate-y-0">
+      <div class="sheet-handle"></div>
+
+      <!-- Quick Toggle: Task vs Expense -->
+      <div class="type-toggle-tabs">
+        <div class="type-tab" :class="{ 'active': addType === 'task' }" @click="addType = 'task'">
+          📝 Task / Chore
+        </div>
+        <div class="type-tab" :class="{ 'active': addType === 'expense' }" @click="addType = 'expense'">
+          💳 Ledger Expense
+        </div>
+      </div>
+
+      <!-- Form: Quick Task -->
+      <template x-if="addType === 'task'">
+        <div>
+          <label style="font-size: 0.8rem; font-weight: 600; color: #94a3b8;">Task Title</label>
+          <input 
+            type="text" 
+            x-model="newTask.title" 
+            placeholder="e.g., Pick up kids from swimming" 
+            autofocus
+            style="margin-bottom: 12px; height: 48px; border-radius: 8px;">
+
+          <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+            <div style="flex: 1;">
+              <label style="font-size: 0.8rem; font-weight: 600; color: #94a3b8;">Time (24h)</label>
+              <input type="time" x-model="newTask.due_time" style="height: 48px; border-radius: 8px;">
+            </div>
+            <div style="flex: 1;">
+              <label style="font-size: 0.8rem; font-weight: 600; color: #94a3b8;">Assignee</label>
+              <select x-model="newTask.assigned_to_id" style="height: 48px; border-radius: 8px;">
+                <option :value="null">Shared (All)</option>
+                <template x-for="p in profiles" :key="p.id">
+                  <option :value="p.id" x-text="p.name"></option>
+                </template>
+              </select>
+            </div>
+          </div>
+        </div>
+      </template>
+
+      <!-- Form: Quick Expense -->
+      <template x-if="addType === 'expense'">
+        <div>
+          <label style="font-size: 0.8rem; font-weight: 600; color: #94a3b8;">Expense Title / Payee</label>
+          <input 
+            type="text" 
+            x-model="newExpense.title" 
+            placeholder="e.g., Supermarket groceries" 
+            autofocus
+            style="margin-bottom: 12px; height: 48px; border-radius: 8px;">
+
+          <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+            <div style="flex: 1;">
+              <label style="font-size: 0.8rem; font-weight: 600; color: #94a3b8;">Amount ($)</label>
+              <input type="number" step="0.01" x-model="newExpense.amount" placeholder="0.00" style="height: 48px; border-radius: 8px;">
+            </div>
+            <div style="flex: 1;">
+              <label style="font-size: 0.8rem; font-weight: 600; color: #94a3b8;">Category</label>
+              <select x-model="newExpense.category" style="height: 48px; border-radius: 8px;">
+                <option value="Groceries">Groceries</option>
+                <option value="Utilities">Utilities</option>
+                <option value="Kids">Kids</option>
+                <option value="Fuel">Fuel</option>
+                <option value="General">General</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </template>
+
+      <!-- Submit Button (48px+ touch target) -->
+      <button 
+        class="touch-btn-submit" 
+        :disabled="isSubmitting" 
+        @click="submitQuickAdd()">
+        <span x-text="isSubmitting ? 'Saving...' : 'Save Entry 💾'"></span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ============================================================== -->
+  <!-- PIN AUTH MODAL KEYPAD (ONE-HANDED THUMB FRIENDLY)              -->
+  <!-- ============================================================== -->
+  <div 
+    class="bottom-sheet-backdrop" 
+    x-show="isPinModalOpen" 
+    x-transition.opacity 
+    @click.self="closePinModal()" 
+    style="display: none;" 
+    x-cloak>
+    
+    <div class="bottom-sheet-content" style="text-align: center;">
+      <div class="sheet-handle"></div>
+
+      <!-- Member Selector -->
+      <div style="display: flex; justify-content: center; gap: 12px; margin-bottom: 16px;">
+        <template x-for="p in profiles" :key="p.id">
+          <div 
+            @click="selectProfileForLogin(p)"
+            :style="'padding: 8px 16px; border-radius: 9999px; cursor: pointer; font-weight: 700; ' + 
+                    (selectedProfileForPin && selectedProfileForPin.id === p.id 
+                      ? 'background: ' + p.avatar_color + '; color: white;' 
+                      : 'background: #334155; color: #94a3b8;')"
+            x-text="p.name">
+          </div>
+        </template>
+      </div>
+
+      <div style="font-size: 0.9rem; color: #94a3b8;">
+        Enter 4-digit PIN for <span style="font-weight: 700; color: white;" x-text="selectedProfileForPin ? selectedProfileForPin.name : 'Profile'"></span>
+      </div>
+
+      <!-- 4 PIN Dots -->
+      <div class="pin-dots">
+        <div class="pin-dot" :class="{ 'filled': enteredPin.length >= 1 }"></div>
+        <div class="pin-dot" :class="{ 'filled': enteredPin.length >= 2 }"></div>
+        <div class="pin-dot" :class="{ 'filled': enteredPin.length >= 3 }"></div>
+        <div class="pin-dot" :class="{ 'filled': enteredPin.length >= 4 }"></div>
+      </div>
+
+      <!-- Error message -->
+      <div x-show="pinError" style="color: #ef4444; font-size: 0.85rem; font-weight: 600; margin-bottom: 8px;" x-text="pinError"></div>
+
+      <!-- Numeric Keypad Grid -->
+      <div class="pin-pad-grid">
+        <button class="pin-key" @click="enterPinDigit('1')">1</button>
+        <button class="pin-key" @click="enterPinDigit('2')">2</button>
+        <button class="pin-key" @click="enterPinDigit('3')">3</button>
+        <button class="pin-key" @click="enterPinDigit('4')">4</button>
+        <button class="pin-key" @click="enterPinDigit('5')">5</button>
+        <button class="pin-key" @click="enterPinDigit('6')">6</button>
+        <button class="pin-key" @click="enterPinDigit('7')">7</button>
+        <button class="pin-key" @click="enterPinDigit('8')">8</button>
+        <button class="pin-key" @click="enterPinDigit('9')">9</button>
+        <button class="pin-key" style="background: transparent; border: none;"></button>
+        <button class="pin-key" @click="enterPinDigit('0')">0</button>
+        <button class="pin-key" @click="deletePinDigit()">⌫</button>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>
