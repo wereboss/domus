@@ -1,4 +1,4 @@
-const CACHE_NAME = "domus-v1";
+const CACHE_NAME = "domus-v2";
 const ASSETS_TO_CACHE = [
   "/",
   "/manifest.json",
@@ -13,6 +13,7 @@ const ASSETS_TO_CACHE = [
 ];
 
 self.addEventListener("install", (event) => {
+  console.log("[ServiceWorker] Installing version:", CACHE_NAME);
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll(ASSETS_TO_CACHE);
@@ -22,11 +23,13 @@ self.addEventListener("install", (event) => {
 });
 
 self.addEventListener("activate", (event) => {
+  console.log("[ServiceWorker] Activating version:", CACHE_NAME);
   event.waitUntil(
     caches.keys().then((keys) => {
       return Promise.all(
         keys.map((key) => {
           if (key !== CACHE_NAME) {
+            console.log("[ServiceWorker] Removing obsolete cache:", key);
             return caches.delete(key);
           }
         })
@@ -42,8 +45,25 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Network-first strategy for APIs, cache fallback for assets
   const url = new URL(event.request.url);
+
+  // Network-first for navigation / HTML documents (offline fallback to cache)
+  if (event.request.mode === "navigate" || url.pathname === "/") {
+    event.respondWith(
+      fetch(event.request)
+        .then((networkResponse) => {
+          if (networkResponse.status === 200) {
+            const responseClone = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseClone));
+          }
+          return networkResponse;
+        })
+        .catch(() => caches.match(event.request))
+    );
+    return;
+  }
+
+  // Network-first strategy for APIs, cache fallback for assets
   if (url.pathname.startsWith("/api/")) {
     event.respondWith(
       fetch(event.request).catch(() => {

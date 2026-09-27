@@ -99,10 +99,21 @@ document.addEventListener("alpine:init", () => {
       });
 
       // Initialize session, profiles, inbox badge, and timeline
-      await this.initSession();
-      await this.loadProfiles();
-      await this.loadInboxCount();
-      await this.loadTimeline();
+      console.log("[Domus] Initializing application...");
+      try {
+        await this.initSession();
+        await this.loadProfiles();
+        await this.loadInboxCount();
+        await this.loadTimeline();
+        console.log("[Domus] App initialized successfully.", {
+          member: this.currentMember?.name || "Guest",
+          offline: this.isOffline,
+          tab: this.activeTab,
+          items: this.timeline.items.length
+        });
+      } catch (err) {
+        console.error("[Domus] Error during initialization:", err);
+      }
     },
 
     async initSession() {
