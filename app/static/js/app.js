@@ -12,9 +12,11 @@ document.addEventListener("alpine:init", () => {
     // PWA Installation & Environment State
     isStandalone: window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true,
     isIOS: /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream,
+    isSecure: window.isSecureContext !== false,
     canInstallPrompt: false,
     deferredInstallPrompt: null,
     showInstallBanner: false,
+    showLanHelpModal: false,
 
     // Auth & Identity State
     currentMember: null,

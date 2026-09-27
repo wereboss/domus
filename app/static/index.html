@@ -7,9 +7,14 @@
   
   <!-- PWA & Mobile Meta Tags -->
   <meta name="theme-color" content="#0f172a">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Domus">
   <link rel="manifest" href="/manifest.json">
+  <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="/static/icons/icon-512.png">
+  <link rel="apple-touch-icon" sizes="192x192" href="/static/icons/icon-192.png">
   <link rel="icon" type="image/svg+xml" href="/static/icons/icon.svg">
 
   <!-- Vendored Core Libraries (100% Offline Capable) -->
@@ -65,7 +70,13 @@
           <div class="install-banner-sub">Tap Safari's Share button (⎋) below, then select <strong>"Add to Home Screen"</strong></div>
         </div>
       </template>
-      <template x-if="!isIOS">
+      <template x-if="!isIOS && !isSecure">
+        <div>
+          <div class="install-banner-text">📲 Install Domus Full-Screen PWA</div>
+          <div class="install-banner-sub">LAN HTTP: <span @click="showLanHelpModal = true" style="color: #38bdf8; text-decoration: underline; font-weight: 600; cursor: pointer;">Enable Standalone Mode</span></div>
+        </div>
+      </template>
+      <template x-if="!isIOS && isSecure">
         <div>
           <div class="install-banner-text">📲 Install Domus on Home Screen</div>
           <div class="install-banner-sub">Enables OS Share Target & 1-tap parent access</div>
@@ -73,7 +84,10 @@
       </template>
     </div>
     <div style="display: flex; gap: 8px; align-items: center; flex-shrink: 0;">
-      <template x-if="!isIOS && canInstallPrompt">
+      <template x-if="!isIOS && !isSecure">
+        <button class="install-action-btn" @click="showLanHelpModal = true" style="background: #3b82f6;">Setup</button>
+      </template>
+      <template x-if="!isIOS && isSecure && canInstallPrompt">
         <button class="install-action-btn" @click="triggerAndroidInstall()">Install</button>
       </template>
       <button @click="dismissInstallBanner()" style="background: transparent; border: none; color: #94a3b8; font-size: 1.1rem; padding: 4px; cursor: pointer;">✕</button>
@@ -824,6 +838,35 @@
       </button>
     </div>
   </div>
+
+  <!-- Android LAN Full-Screen PWA Setup Modal -->
+  <dialog :open="showLanHelpModal" style="max-width: 500px;" x-cloak>
+    <article style="background: #1e293b; color: #f8fafc; border-radius: 12px; border: 1px solid #334155; padding: 20px;">
+      <header style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+        <h4 style="margin: 0; font-size: 1.1rem; color: #f8fafc;">📱 Android Full-Screen PWA Setup</h4>
+        <button @click="showLanHelpModal = false" style="background: none; border: none; color: #94a3b8; font-size: 1.2rem; cursor: pointer;">✕</button>
+      </header>
+      
+      <p style="font-size: 0.88rem; color: #cbd5e1; margin-bottom: 12px;">
+        Android Chrome only installs full-screen standalone apps (WebAPKs) on secure origins. Over local LAN HTTP, Chrome creates a simple browser shortcut unless the LAN origin is whitelisted in Chrome flags:
+      </p>
+
+      <ol style="font-size: 0.85rem; color: #94a3b8; line-height: 1.6; padding-left: 20px; margin-bottom: 16px;">
+        <li>Open a new tab in Chrome and go to:<br>
+          <code style="background: #0f172a; padding: 4px 8px; border-radius: 4px; color: #38bdf8; word-break: break-all; font-size: 0.8rem; display: inline-block; margin-top: 4px;">chrome://flags/#unsafely-treat-insecure-origin-as-secure</code>
+        </li>
+        <li style="margin-top: 10px;">In the text box, paste your Domus LAN URL:<br>
+          <code style="background: #0f172a; padding: 4px 8px; border-radius: 4px; color: #10b981; font-size: 0.85rem; display: inline-block; margin-top: 4px;" x-text="window.location.origin"></code>
+        </li>
+        <li style="margin-top: 10px;">Set the flag to <strong>Enabled</strong> and tap <strong>Relaunch</strong> at the bottom of Chrome.</li>
+        <li style="margin-top: 10px;">Return here: the banner will now show <strong>"Install"</strong>, installing Domus as a standalone full-screen app!</li>
+      </ol>
+
+      <footer style="display: flex; justify-content: flex-end; margin-top: 12px;">
+        <button class="domus-btn domus-btn-primary" @click="showLanHelpModal = false" style="width: auto; padding: 8px 18px;">Got It 👍</button>
+      </footer>
+    </article>
+  </dialog>
 
 </body>
 </html>

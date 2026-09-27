@@ -1,4 +1,4 @@
-const CACHE_NAME = "domus-v2";
+const CACHE_NAME = "domus-v3";
 const ASSETS_TO_CACHE = [
   "/",
   "/manifest.json",
@@ -9,7 +9,11 @@ const ASSETS_TO_CACHE = [
   "/static/js/db.js",
   "/static/js/api.js",
   "/static/js/app.js",
-  "/static/icons/icon.svg"
+  "/static/icons/icon.svg",
+  "/static/icons/icon-192.png",
+  "/static/icons/icon-512.png",
+  "/static/icons/icon-maskable-192.png",
+  "/static/icons/icon-maskable-512.png"
 ];
 
 self.addEventListener("install", (event) => {

@@ -31,3 +31,9 @@ def test_serve_static_assets(client):
 
     icon_resp = client.get("/static/icons/icon.svg")
     assert icon_resp.status_code == 200
+
+    icon_192_resp = client.get("/static/icons/icon-192.png")
+    assert icon_192_resp.status_code == 200
+
+    icon_512_resp = client.get("/static/icons/icon-512.png")
+    assert icon_512_resp.status_code == 200
