@@ -318,35 +318,35 @@ body {
   font-size: 1.25rem;
 }
 
-/* Center Floating Add Button */
-.center-fab-wrapper {
-  position: relative;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  flex: 1;
-}
-
-.center-fab {
-  width: 52px;
-  height: 52px;
+/* Floating Action Button (FAB) anchored bottom-right above Family tab */
+.floating-fab {
+  position: fixed;
+  right: 20px;
+  bottom: calc(var(--bottom-bar-height) + var(--safe-bottom) + 16px);
+  width: 54px;
+  height: 54px;
   border-radius: 50%;
   background: #2563eb;
   color: white;
-  border: 3px solid #0f172a;
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 6px 18px rgba(37, 99, 235, 0.45);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.75rem;
+  font-size: 2rem;
   font-weight: 300;
   cursor: pointer;
-  transform: translateY(-12px);
-  transition: transform 0.15s ease;
+  z-index: 45;
+  transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.15s ease;
 }
 
-.center-fab:active {
-  transform: translateY(-8px) scale(0.95);
+.floating-fab:hover {
+  background: #1d4ed8;
+  box-shadow: 0 8px 24px rgba(37, 99, 235, 0.6);
+}
+
+.floating-fab:active {
+  transform: scale(0.92);
 }
 
 /* Bottom Sheet Modal Drawer */

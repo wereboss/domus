@@ -3,6 +3,8 @@ def test_serve_index_html(client):
     assert response.status_code == 200
     assert "Domus - Your Home, Organised" in response.text
     assert "alpine.min.js" in response.text
+    assert "floating-fab" in response.text
+    assert "Financials" in response.text
 
 def test_serve_pwa_manifest(client):
     response = client.get("/manifest.json")

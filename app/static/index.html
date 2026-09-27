@@ -365,39 +365,37 @@
     </div>
   </main>
 
+  <!-- Floating Action Button (FAB) anchored bottom-right above Family tab -->
+  <button class="floating-fab" @click="openAddSheet()" aria-label="Quick Add Entry">
+    +
+  </button>
+
   <!-- ============================================================== -->
   <!-- BOTTOM NAVIGATION BAR (UX DIRECTIVE 1: THUMB-ANCHORED)        -->
   <!-- ============================================================== -->
   <nav class="bottom-nav">
-    <!-- Tab 1: Today -->
-    <button class="nav-tab" :class="{ 'active': activeTab === 'today' }" @click="switchTab('today')">
-      <span class="nav-tab-icon">📅</span>
-      <span>Today</span>
-    </button>
-
-    <!-- Tab 2: Inbox -->
+    <!-- Tab 1: Inbox -->
     <button class="nav-tab" :class="{ 'active': activeTab === 'inbox' }" @click="switchTab('inbox')">
       <span class="nav-tab-icon">📥</span>
       <span>Inbox</span>
     </button>
 
-    <!-- Center Floating Action Button (+) -->
-    <div class="center-fab-wrapper">
-      <button class="center-fab" @click="openAddSheet()" aria-label="Quick Add Entry">
-        +
-      </button>
-    </div>
-
-    <!-- Tab 3: Logistics -->
+    <!-- Tab 2: Logistics -->
     <button class="nav-tab" :class="{ 'active': activeTab === 'logistics' }" @click="switchTab('logistics')">
       <span class="nav-tab-icon">📋</span>
       <span>Logistics</span>
     </button>
 
-    <!-- Tab 4: Finances -->
+    <!-- Tab 3: Today (Center) -->
+    <button class="nav-tab" :class="{ 'active': activeTab === 'today' }" @click="switchTab('today')">
+      <span class="nav-tab-icon">📅</span>
+      <span>Today</span>
+    </button>
+
+    <!-- Tab 4: Financials -->
     <button class="nav-tab" :class="{ 'active': activeTab === 'finances' }" @click="switchTab('finances')">
       <span class="nav-tab-icon">💰</span>
-      <span>Finances</span>
+      <span>Financials</span>
     </button>
 
     <!-- Tab 5: Family -->

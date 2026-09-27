@@ -106,6 +106,9 @@ document.addEventListener("alpine:init", () => {
     },
 
     switchTab(tab) {
+      if (tab === "today") {
+        this.currentDate = this.todayDate;
+      }
       this.activeTab = tab;
       this.loadCurrentTab();
     },
