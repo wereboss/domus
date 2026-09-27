@@ -10,6 +10,7 @@ from app.api.auth import router as auth_router
 from app.api.logistics import router as logistics_router
 from app.api.finance import router as finance_router
 from app.api.timeline import router as timeline_router
+from app.api.inbox import router as inbox_router
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 
@@ -39,6 +40,7 @@ app.include_router(auth_router)
 app.include_router(logistics_router)
 app.include_router(finance_router)
 app.include_router(timeline_router)
+app.include_router(inbox_router)
 
 # Mount static assets directory
 if STATIC_DIR.exists():

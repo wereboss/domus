@@ -12,6 +12,9 @@ def test_serve_pwa_manifest(client):
     data = response.json()
     assert data["name"] == "Domus - Your Home, Organised"
     assert data["display"] == "standalone"
+    assert "share_target" in data
+    assert data["share_target"]["action"] == "/share-target"
+    assert "multipart/form-data" in data["share_target"]["enctype"]
 
 def test_serve_service_worker(client):
     response = client.get("/sw.js")

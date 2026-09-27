@@ -13,7 +13,9 @@ async function initAuthToken() {
 
 async function request(url, options = {}) {
   const headers = options.headers || {};
-  headers["Content-Type"] = "application/json";
+  if (!(options.body instanceof FormData)) {
+    headers["Content-Type"] = "application/json";
+  }
 
   if (currentToken) {
     headers["Authorization"] = `Bearer ${currentToken}`;
@@ -140,5 +142,41 @@ const api = {
 
   async getBills() {
     return await request("/api/bills");
+  },
+
+  // Family Inbox
+  async getInbox() {
+    return await request("/api/inbox");
+  },
+
+  async getInboxCount() {
+    return await request("/api/inbox/count");
+  },
+
+  async createInboxItem(data) {
+    return await request("/api/inbox", {
+      method: "POST",
+      body: JSON.stringify(data)
+    });
+  },
+
+  async uploadInboxFile(formData) {
+    return await request("/api/inbox/upload", {
+      method: "POST",
+      body: formData
+    });
+  },
+
+  async triageInboxItem(itemId, triageData) {
+    return await request(`/api/inbox/${itemId}/triage`, {
+      method: "POST",
+      body: JSON.stringify(triageData)
+    });
+  },
+
+  async dismissInboxItem(itemId) {
+    return await request(`/api/inbox/${itemId}`, {
+      method: "DELETE"
+    });
   }
 };

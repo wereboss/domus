@@ -3,11 +3,18 @@
 document.addEventListener("alpine:init", () => {
   Alpine.data("domusApp", () => ({
     // Navigation & View State
-    activeTab: "today",       // "today", "inbox", "logistics", "finances", "family"
+    activeTab: "today",       // "inbox", "logistics", "today", "finances", "family"
     filterView: "all",        // "all", "mine"
     currentDate: new Date().toISOString().split("T")[0],
     todayDate: new Date().toISOString().split("T")[0],
     isOffline: !navigator.onLine,
+
+    // PWA Installation & Environment State
+    isStandalone: window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true,
+    isIOS: /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream,
+    canInstallPrompt: false,
+    deferredInstallPrompt: null,
+    showInstallBanner: false,
 
     // Auth & Identity State
     currentMember: null,
@@ -26,6 +33,24 @@ document.addEventListener("alpine:init", () => {
     notes: [],
     expenses: [],
     bills: [],
+
+    // Family Inbox & Capture State
+    inboxItems: [],
+    inboxPendingCount: 0,
+    isTriageOpen: false,
+    selectedInboxItem: null,
+    isUploadingInbox: false,
+    triageForm: {
+      target_type: "task",
+      title: "",
+      due_date: "",
+      due_time: "",
+      priority: "normal",
+      assigned_to_id: null,
+      amount: "",
+      category: "General",
+      content: ""
+    },
 
     // Quick-Add Bottom Sheet
     isAddOpen: false,
@@ -60,9 +85,23 @@ document.addEventListener("alpine:init", () => {
         this.openPinModal();
       });
 
-      // Initialize session and profiles
+      // PWA Installation Prompts
+      if (!this.isStandalone && !localStorage.getItem("domus_install_dismissed")) {
+        this.showInstallBanner = true;
+      }
+      window.addEventListener("beforeinstallprompt", (e) => {
+        e.preventDefault();
+        this.deferredInstallPrompt = e;
+        this.canInstallPrompt = true;
+        if (!this.isStandalone && !localStorage.getItem("domus_install_dismissed")) {
+          this.showInstallBanner = true;
+        }
+      });
+
+      // Initialize session, profiles, inbox badge, and timeline
       await this.initSession();
       await this.loadProfiles();
+      await this.loadInboxCount();
       await this.loadTimeline();
     },
 
@@ -86,6 +125,7 @@ document.addEventListener("alpine:init", () => {
       const result = await api.getTimeline(this.currentDate, this.filterView);
       this.timeline = result.data;
       this.isOffline = result.isOffline;
+      await this.loadInboxCount();
     },
 
     setDate(offsetDays) {
@@ -116,12 +156,165 @@ document.addEventListener("alpine:init", () => {
     async loadCurrentTab() {
       if (this.activeTab === "today") {
         await this.loadTimeline();
+      } else if (this.activeTab === "inbox") {
+        await this.loadInbox();
       } else if (this.activeTab === "logistics") {
         this.chores = await api.getChores();
         this.notes = await api.getNotes();
       } else if (this.activeTab === "finances") {
         this.expenses = await api.getExpenses();
         this.bills = await api.getBills();
+      }
+      await this.loadInboxCount();
+    },
+
+    // ================= FAMILY INBOX & CAPTURE =================
+    async loadInbox() {
+      try {
+        this.inboxItems = await api.getInbox();
+        this.inboxPendingCount = this.inboxItems.length;
+      } catch (err) {
+        console.warn("Could not load inbox items:", err);
+      }
+    },
+
+    async loadInboxCount() {
+      try {
+        const res = await api.getInboxCount();
+        this.inboxPendingCount = res.pending_count;
+      } catch (err) {
+        console.warn("Could not fetch inbox count:", err);
+      }
+    },
+
+    async pasteFromClipboard() {
+      try {
+        if (!navigator.clipboard || !navigator.clipboard.readText) {
+          throw new Error("Clipboard API unavailable");
+        }
+        const text = await navigator.clipboard.readText();
+        if (!text || !text.trim()) {
+          alert("Clipboard is empty or contains no readable text.");
+          return;
+        }
+        await api.createInboxItem({
+          source: "clipboard",
+          raw_content: text.trim(),
+          title: text.trim().substring(0, 60)
+        });
+        await this.loadInbox();
+        await this.loadInboxCount();
+      } catch (err) {
+        const manualText = prompt("Paste your link or text below:");
+        if (manualText && manualText.trim()) {
+          await api.createInboxItem({
+            source: "manual_paste",
+            raw_content: manualText.trim(),
+            title: manualText.trim().substring(0, 60)
+          });
+          await this.loadInbox();
+          await this.loadInboxCount();
+        }
+      }
+    },
+
+    async handleFileUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const formData = new FormData();
+      formData.append("file", file);
+      this.isUploadingInbox = true;
+
+      try {
+        await api.uploadInboxFile(formData);
+        await this.loadInbox();
+        await this.loadInboxCount();
+      } catch (err) {
+        alert(err.message || "Failed to upload file. Ensure it is an image or PDF under 25MB.");
+      } finally {
+        this.isUploadingInbox = false;
+        event.target.value = "";
+      }
+    },
+
+    openTriage(item) {
+      this.selectedInboxItem = item;
+      this.triageForm = {
+        target_type: "task",
+        title: item.title || item.raw_content || "",
+        due_date: this.todayDate,
+        due_time: "",
+        priority: "normal",
+        assigned_to_id: this.currentMember ? this.currentMember.id : null,
+        amount: "",
+        category: "General",
+        content: item.raw_content || (item.file_name ? `File: ${item.file_name}` : "")
+      };
+      this.isTriageOpen = true;
+    },
+
+    closeTriage() {
+      this.isTriageOpen = false;
+      this.selectedInboxItem = null;
+    },
+
+    async submitTriage() {
+      if (!this.selectedInboxItem) return;
+      this.isSubmitting = true;
+
+      try {
+        const payload = {
+          target_type: this.triageForm.target_type,
+          title: this.triageForm.title.trim(),
+          due_date: this.triageForm.due_date || this.todayDate,
+          due_time: this.triageForm.due_time || null,
+          priority: this.triageForm.priority,
+          assigned_to_id: this.triageForm.assigned_to_id ? parseInt(this.triageForm.assigned_to_id) : null,
+          amount: this.triageForm.amount ? parseFloat(this.triageForm.amount) : null,
+          category: this.triageForm.category,
+          payment_method: "Card",
+          content: this.triageForm.content
+        };
+
+        await api.triageInboxItem(this.selectedInboxItem.id, payload);
+        this.closeTriage();
+        await this.loadInbox();
+        await this.loadInboxCount();
+        await this.loadTimeline();
+      } catch (err) {
+        alert(err.message || "Failed to convert inbox item");
+      } finally {
+        this.isSubmitting = false;
+      }
+    },
+
+    async dismissItem(item) {
+      try {
+        // Optimistic removal
+        this.inboxItems = this.inboxItems.filter(i => i.id !== item.id);
+        this.inboxPendingCount = Math.max(0, this.inboxPendingCount - 1);
+        await api.dismissInboxItem(item.id);
+      } catch (err) {
+        console.error("Failed to dismiss inbox item:", err);
+        await this.loadInbox();
+      }
+    },
+
+    // ================= PWA INSTALLATION HELPERS =================
+    dismissInstallBanner() {
+      this.showInstallBanner = false;
+      localStorage.setItem("domus_install_dismissed", "true");
+    },
+
+    async triggerAndroidInstall() {
+      if (this.deferredInstallPrompt) {
+        this.deferredInstallPrompt.prompt();
+        const choiceResult = await this.deferredInstallPrompt.userChoice;
+        if (choiceResult.outcome === "accepted") {
+          this.showInstallBanner = false;
+        }
+        this.deferredInstallPrompt = null;
       }
     },
 
@@ -130,7 +323,6 @@ document.addEventListener("alpine:init", () => {
       if (item.item_type !== "task") return;
       const taskId = parseInt(item.id.replace("task-", ""));
       
-      // Optimistic local update
       const previousState = item.is_completed;
       item.is_completed = !previousState;
       if (item.is_completed) {
@@ -142,7 +334,6 @@ document.addEventListener("alpine:init", () => {
       try {
         await api.toggleTask(taskId, item.is_completed);
       } catch (err) {
-        // Rollback on network failure
         item.is_completed = previousState;
         console.error("Task toggle failed:", err);
       }
@@ -278,6 +469,13 @@ document.addEventListener("alpine:init", () => {
       if (!dateStr) return "";
       const d = new Date(dateStr + "T00:00:00");
       return d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+    },
+
+    formatFileSize(bytes) {
+      if (!bytes) return "";
+      if (bytes < 1024) return bytes + " B";
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+      return (bytes / (1024 * 1024)).toFixed(1) + " MB";
     }
   }));
 });

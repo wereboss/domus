@@ -4,6 +4,7 @@ from app.db.logistics import logistics_engine, LogisticsSessionLocal
 from app.db.finance import finance_engine, FinanceSessionLocal
 from app.models.member import HouseholdMember
 from app.models.logistics import Task, Chore, Note
+from app.models.inbox import UnprocessedInbox
 from app.models.finance import LedgerExpense, FixedBill
 from app.auth.pin import hash_pin
 

@@ -7,13 +7,18 @@ Domus is an offline-first Progressive Web App (PWA) designed for parents to mana
 ## Architecture Foundation (Phase 1 Baseline)
 
 - **Database Layer (Option A: Dual SQLite WAL):**
-  - `data/logistics.db`: Household members, tasks, chores, notes.
+  - `data/logistics.db`: Household members, tasks, chores, notes, and `unprocessed_inbox`.
   - `data/finance.db`: Daily ledger expenses, recurring fixed bills.
   - Physically decoupled database engines with SQLite WAL mode enabled.
 - **Backend Orchestrator:** FastAPI asynchronous API core.
 - **Frontend App Shell:** Single-Page PWA built with HTML5, Pico.css, Alpine.js, and Dexie.js (IndexedDB).
 - **Authentication:** Lightweight 4-digit PIN authentication per household member with persistent device sessions and instant profile switching.
 - **Unified Timeline:** In-memory chronological aggregator interleaving overdue tasks, due bills, timed events, and daily chores into a single glanceable feed.
+- **Mobile Capture Engine (Phase 2):**
+  - **OS Web Share Target:** Intercepts shared links, text, images, and PDFs directly from Android and iOS native share sheets into `unprocessed_inbox` with auto-closing confirmation toast.
+  - **In-App Quick Capture:** 1-tap clipboard paste and native camera / PDF picker.
+  - **Family Inbox Triage Deck:** 48×48px touch targets to convert unorganized inputs directly into Tasks, Expenses, or Notes.
+  - **Smart PWA Install Guidance:** Platform-aware installation prompt (Android 1-tap install sheet + iOS Safari Share guide).
 
 ---
 
